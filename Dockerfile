@@ -125,7 +125,7 @@ RUN apt-get update && \
     curl git python3.8 python3.8-dev python3-libnvinfer libopenmpi-dev libopenblas-base libomp-dev gcc libhdf5-dev gcc-8\
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3.8 get-pip.py
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3.8 get-pip.py && rm get-pip.py
 RUN pip3.8 install wheel
 RUN pip install --upgrade pip setuptools wheel
 RUN pip3.8 install --upgrade pip setuptools wheel
