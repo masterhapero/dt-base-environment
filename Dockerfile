@@ -1,7 +1,7 @@
 # parameters
 ARG ROS_DISTRO=noetic
-#ARG OS_FAMILY=nvcr.io/nvidia/l4t-cuda
-ARG OS_FAMILY=dustynv/ros
+ARG OS_FAMILY=nvcr.io/nvidia/l4t-cuda
+#ARG OS_FAMILY=dustynv/ros
 ARG OS_DISTRO=bionic
 ARG DISTRO=daffy
 ARG LAUNCHER=default
@@ -12,8 +12,8 @@ ARG DESCRIPTION="Base image of any Duckietown software module. Based on ${OS_FAM
 ARG ICON="square"
 
 # base image
-#FROM ${OS_FAMILY}:10.2.460-runtime
-FROM ${OS_FAMILY}:noetic-ros-base-l4t-r32.4.4
+FROM ${OS_FAMILY}:10.2.460-runtime
+#FROM ${OS_FAMILY}:noetic-ros-base-l4t-r32.4.4
 	
 # recall all arguments
 ARG OS_FAMILY
@@ -104,8 +104,8 @@ RUN dt-apt-install "${REPO_PATH}/dependencies-apt.txt"
 
 # To fix CMake issue, we need to rebuild for arm
 SHELL ["/bin/bash", "-c"]
-ARG NCPUS=2
-RUN if [ "$TARGETPLATFORM" == "linux/arm/v7" ]; \
+ARG NCPUS=4
+RUN if [ "$TARGETPLATFORM" == "linux/arm64" ]; \
     then \
       export CFLAGS="-D_FILE_OFFSET_BITS=64" && \
       export CXXFLAGS="-D_FILE_OFFSET_BITS=64" && \
