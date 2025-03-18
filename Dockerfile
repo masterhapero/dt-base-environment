@@ -1,7 +1,8 @@
 # parameters
 ARG ROS_DISTRO=noetic
-ARG OS_FAMILY=ubuntu
-ARG OS_DISTRO=focal
+#ARG OS_FAMILY=nvcr.io/nvidia/l4t-cuda
+ARG OS_FAMILY=dustynv/ros
+ARG OS_DISTRO=bionic
 ARG DISTRO=daffy
 ARG LAUNCHER=default
 # ---
@@ -11,8 +12,9 @@ ARG DESCRIPTION="Base image of any Duckietown software module. Based on ${OS_FAM
 ARG ICON="square"
 
 # base image
-FROM ${OS_FAMILY}:${OS_DISTRO}
-
+#FROM ${OS_FAMILY}:10.2.460-runtime
+FROM ${OS_FAMILY}:noetic-ros-base-l4t-r32.4.4
+	
 # recall all arguments
 ARG OS_FAMILY
 ARG OS_DISTRO
@@ -85,11 +87,16 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends gnupg \
   && rm -rf /var/lib/apt/lists/*
 
+# Add NVIDIA repositories for TensorRT dependencies
+RUN wget -q -O - https://repo.download.nvidia.com/jetson/jetson-ota-public.asc | apt-key add - && \
+  echo "deb https://repo.download.nvidia.com/jetson/common r32.7 main" > /etc/apt/sources.list.d/nvidia-l4t-apt-source.list && \
+  echo "deb https://repo.download.nvidia.com/jetson/t194 r32.7 main" >> /etc/apt/sources.list.d/nvidia-l4t-apt-source.list
+
 # setup ROS sources
 RUN apt-key adv \
     --keyserver hkp://keyserver.ubuntu.com:80 \
     --recv-keys F42ED6FBAB17C654 \
-    && echo "deb http://packages.ros.org/ros/ubuntu ${OS_DISTRO} main" >> /etc/apt/sources.list.d/ros.list
+    && echo "deb [arch=${TARGETARCH}] http://packages.ros.org/ros2/ubuntu ${OS_DISTRO} main" >> /etc/apt/sources.list.d/ros.list
 
 # install dependencies (APT)
 COPY ./dependencies-apt.txt "${REPO_PATH}/"
@@ -112,17 +119,34 @@ RUN if [ "$TARGETPLATFORM" == "linux/arm/v7" ]; \
       rm -rf cmake; \
     fi
 
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    curl git python3.8 python3.8-dev python3-libnvinfer libopenmpi-dev libopenblas-base libomp-dev gcc libhdf5-dev gcc-8\
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3.8 get-pip.py
+RUN pip3.8 install wheel
+RUN pip install --upgrade pip setuptools wheel
+RUN pip3.8 install --upgrade pip setuptools wheel
+
+# Create symbolic links for python3.8 and pip3
+RUN ln -sf /usr/bin/python3.8 /usr/bin/python3
+RUN ln -s /usr/bin/pip3 /usr/bin/pip
+
 # install dependencies (python3 -m pip)
 ARG PIP_INDEX_URL="https://pypi.org/simple/"
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
 
 # upgrade PIP
-RUN python3 -m pip install pip==22.2 && \
-    ln -s $(which python3.8) /usr/bin/pip3.8
+#RUN python3 -m pip install pip==22.2 && \
+RUN ln -s $(which python3.8) /usr/bin/pip3.8
 
+# Python dependencies below fail without this
+RUN pip3 install scikit-learn==1.0.2
 # install dependencies (PIP3)
 COPY ./dependencies-py3.* "${REPO_PATH}/"
-RUN dt-pip3-install "${REPO_PATH}/dependencies-py3.*"
+RUN SETUPTOOLS_USE_DISTUTILS=1 dt-pip3-install "${REPO_PATH}/dependencies-py3.*"
 
 # install RPi libs
 COPY assets/vc.tgz /opt/
