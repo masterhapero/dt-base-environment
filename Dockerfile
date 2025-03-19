@@ -49,6 +49,14 @@ ENV INITSYSTEM="off" \
 ENV NVIDIA_VISIBLE_DEVICES="all" \
     NVIDIA_DRIVER_CAPABILITIES="all"
 
+# Credits for jetson-containers! ROS_PYTHON_VERSION configures later catkin_make_isolated
+ARG ROS_PKG=ros_base
+ENV ROS_DISTRO=noetic
+ENV ROS_PYTHON_VERSION=3
+ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
+
+ENV DEBIAN_FRONTEND=noninteractive
+
 # keep some arguments as environment variables
 ENV OS_FAMILY="${OS_FAMILY}" \
     OS_DISTRO="${OS_DISTRO}" \
@@ -102,16 +110,22 @@ RUN apt-key adv \
 COPY ./dependencies-apt.txt "${REPO_PATH}/"
 RUN dt-apt-install "${REPO_PATH}/dependencies-apt.txt"
 
+RUN apt-get update && \
+    apt-get install -y curl && \
+    rm -rf /var/lib/apt/lists/*
+
 # To fix CMake issue, we need to rebuild for arm
+RUN echo TARGETPLATFORM ${TARGETPLATFORM} TARGETARCH ${TARGETARCH}
 SHELL ["/bin/bash", "-c"]
 ARG NCPUS=4
-RUN if [ "$TARGETPLATFORM" == "linux/arm64" ]; \
+RUN if [ "$TARGETPLATFORM" == "linux/arm64x" ]; \
     then \
       export CFLAGS="-D_FILE_OFFSET_BITS=64" && \
       export CXXFLAGS="-D_FILE_OFFSET_BITS=64" && \
       mkdir cmake && \
-      git clone https://gitlab.kitware.com/cmake/cmake.git cmake && \
-      cd cmake && \
+      curl -o cmake-3.13.1.tar.gz https://cmake.org/files/v3.13/cmake-3.13.1.tar.gz && \
+      tar xvzf cmake-3.13.1.tar.gz && \
+      cd cmake-3.13.1 && \
       ./bootstrap && \
       make -j${NCPUS} && \
       make install && \
@@ -147,6 +161,38 @@ RUN pip3 install scikit-learn==1.0.2
 # install dependencies (PIP3)
 COPY ./dependencies-py3.* "${REPO_PATH}/"
 RUN SETUPTOOLS_USE_DISTUTILS=1 dt-pip3-install "${REPO_PATH}/dependencies-py3.*"
+
+# install ROS bootstrap dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+          libpython3-dev \
+          python3-rosdep \
+          python3-rosdep-modules \
+          python3-rosdistro \
+          python3-rosdistro-modules \
+          python3-rosinstall-generator \
+          python3-rospkg \
+          python3-rospkg-modules \
+	  python3-catkin-pkg \
+          python3-vcstool \
+          build-essential && \
+    rosdep init && \
+    rosdep update && \
+    rm -rf /var/lib/apt/lists/*
+
+# Fix empy for ROS
+RUN ln -sf /usr/bin/empy3 /usr/bin/empy
+
+# download/build the ROS source
+RUN mkdir ros_catkin_ws && \
+    cd ros_catkin_ws && \
+    rosinstall_generator ${ROS_PKG} vision_msgs --rosdistro ${ROS_DISTRO} --deps --tar > ${ROS_DISTRO}-${ROS_PKG}.rosinstall && \
+    mkdir src && \
+    vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src && \
+    apt-get update && \
+    rosdep install --from-paths ./src --ignore-packages-from-source --rosdistro ${ROS_DISTRO} -y && \
+    python3 ./src/catkin/bin/catkin_make_isolated --install --install-space ${ROS_ROOT} -DCMAKE_BUILD_TYPE=Release && \
+    rm -rf /var/lib/apt/lists/*
 
 # install RPi libs
 COPY assets/vc.tgz /opt/
