@@ -1,8 +1,7 @@
 # parameters
 ARG ROS_DISTRO=noetic
 ARG OS_FAMILY=nvcr.io/nvidia/l4t-cuda
-#ARG OS_FAMILY=dustynv/ros
-ARG OS_DISTRO=bionic
+ARG OS_DISTRO=focal
 ARG DISTRO=daffy
 ARG LAUNCHER=default
 # ---
@@ -10,10 +9,11 @@ ARG REPO_NAME="dt-base-environment"
 ARG MAINTAINER="Andrea F. Daniele (afdaniele@duckietown.com)"
 ARG DESCRIPTION="Base image of any Duckietown software module. Based on ${OS_FAMILY}:${OS_DISTRO}."
 ARG ICON="square"
+ARG BASE_TAG=${OS_DISTRO}
+ARG BASE_IMAGE=${OS_FAMILY}
 
 # base image
-FROM ${OS_FAMILY}:10.2.460-runtime
-#FROM ${OS_FAMILY}:noetic-ros-base-l4t-r32.4.4
+FROM ${BASE_IMAGE}:${BASE_TAG}
 	
 # recall all arguments
 ARG OS_FAMILY
@@ -45,13 +45,13 @@ ENV INITSYSTEM="off" \
     QEMU_EXECVE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_ROOT_USER_ACTION=ignore
+
 # nvidia runtime configuration
 ENV NVIDIA_VISIBLE_DEVICES="all" \
     NVIDIA_DRIVER_CAPABILITIES="all"
 
 # Credits for jetson-containers! ROS_PYTHON_VERSION configures later catkin_make_isolated
 ARG ROS_PKG=ros_base
-ENV ROS_DISTRO=noetic
 ENV ROS_PYTHON_VERSION=3
 ENV ROS_ROOT=/opt/ros/${ROS_DISTRO}
 
@@ -78,7 +78,9 @@ ENV USER_WS_DIR "${SOURCE_DIR}/user_ws"
 WORKDIR "${SOURCE_DIR}"
 
 # copy QEMU
-COPY ./assets/qemu/${TARGETPLATFORM}/ /usr/bin/
+# Note: Don't! Segfaults too easy ..
+# use: docker run --privileged --rm tonistiigi/binfmt:qemu-v8.1.5 --install all
+#COPY ./assets/qemu/${TARGETPLATFORM}/ /usr/bin/
 
 # copy binaries
 COPY ./assets/bin/. /usr/local/bin/
@@ -104,7 +106,7 @@ RUN wget -q -O - https://repo.download.nvidia.com/jetson/jetson-ota-public.asc |
 RUN apt-key adv \
     --keyserver hkp://keyserver.ubuntu.com:80 \
     --recv-keys F42ED6FBAB17C654 \
-    && echo "deb [arch=${TARGETARCH}] http://packages.ros.org/ros2/ubuntu ${OS_DISTRO} main" >> /etc/apt/sources.list.d/ros.list
+    && echo "deb http://packages.ros.org/ros2/ubuntu ${OS_DISTRO} main" >> /etc/apt/sources.list.d/ros.list
 
 # install dependencies (APT)
 COPY ./dependencies-apt.txt "${REPO_PATH}/"
@@ -118,14 +120,13 @@ RUN apt-get update && \
 RUN echo TARGETPLATFORM ${TARGETPLATFORM} TARGETARCH ${TARGETARCH}
 SHELL ["/bin/bash", "-c"]
 ARG NCPUS=4
-RUN if [ "$TARGETPLATFORM" == "linux/arm64x" ]; \
+RUN if [ "$TARGETPLATFORM" == "linux/arm/v7" ]; \
     then \
       export CFLAGS="-D_FILE_OFFSET_BITS=64" && \
       export CXXFLAGS="-D_FILE_OFFSET_BITS=64" && \
       mkdir cmake && \
-      curl -o cmake-3.13.1.tar.gz https://cmake.org/files/v3.13/cmake-3.13.1.tar.gz && \
-      tar xvzf cmake-3.13.1.tar.gz && \
-      cd cmake-3.13.1 && \
+      git clone https://gitlab.kitware.com/cmake/cmake.git cmake && \
+      cd cmake && \
       ./bootstrap && \
       make -j${NCPUS} && \
       make install && \
