@@ -187,7 +187,7 @@ RUN ln -sf /usr/bin/empy3 /usr/bin/empy
 # download/build the ROS source
 RUN mkdir ros_catkin_ws && \
     cd ros_catkin_ws && \
-    rosinstall_generator ${ROS_PKG} vision_msgs --rosdistro ${ROS_DISTRO} --deps --tar > ${ROS_DISTRO}-${ROS_PKG}.rosinstall && \
+    rosinstall_generator ${ROS_PKG} vision_msgs cv_bridge joy --rosdistro ${ROS_DISTRO} --deps --tar > ${ROS_DISTRO}-${ROS_PKG}.rosinstall && \
     mkdir src && \
     vcs import --input ${ROS_DISTRO}-${ROS_PKG}.rosinstall ./src && \
     apt-get update && \
