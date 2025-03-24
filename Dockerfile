@@ -147,7 +147,8 @@ RUN pip3.8 install --upgrade pip setuptools wheel
 
 # Create symbolic links for python3.8 and pip3
 RUN ln -sf /usr/bin/python3.8 /usr/bin/python3
-RUN ln -s /usr/bin/pip3 /usr/bin/pip
+RUN ln -s /usr/bin/pip3.8 /usr/bin/pip3
+RUN ln -s /usr/bin/pip3.8 /usr/bin/pip
 
 # install dependencies (python3 -m pip)
 ARG PIP_INDEX_URL="https://pypi.org/simple/"
